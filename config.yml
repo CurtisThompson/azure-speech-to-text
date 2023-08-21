@@ -1,0 +1,10 @@
+azure:
+  key: abcdef1234567890
+  endpoint: https://x.cognitiveservices.azure.com/
+  wait_ms: 1000
+
+data:
+  input_path: '.'
+  output_path: '.'
+
+verbose: True
