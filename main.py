@@ -1,24 +1,20 @@
-import yaml
 import time
+import os
+import sys
 
+import yaml
 import azure.cognitiveservices.speech as speechsdk
 
 
 def load_config_file(file='config.yml'):
     """Reads a YAML-formatted config file."""
-    with open('config.yml', 'r') as f:
+    with open(file, 'r') as f:
         config = yaml.safe_load(f)
     return config
 
 
-def speech_recognize_continuous_from_file(config=load_config_file()):
+def speech_recognize_continuous_from_file(AZ_KEY, AZ_REGION, INPUT_FILE, VERBOSE):
     """Performs continuous speech recognition with input from a WAV audio file."""
-
-    # Get required parameters from config
-    AZ_KEY = config['azure']['key']
-    AZ_REGION = config['azure']['region']
-    INPUT_FILE = config['data']['input_path']
-    VERBOSE = config['verbose']
 
     # Configure Azure speech to text based on stream and API key
     speech_config = speechsdk.SpeechConfig(subscription=AZ_KEY, region=AZ_REGION)
@@ -31,6 +27,9 @@ def speech_recognize_continuous_from_file(config=load_config_file()):
     done = False
     final_result = ''
 
+    # Add file name to final_result
+    final_result += str(INPUT_FILE.split('/')[-1]) + '\n'
+
     # Stopping callback
     def stop_cb(evt):
         """callback that stops continuous recognition upon receiving an event `evt`"""
@@ -39,7 +38,7 @@ def speech_recognize_continuous_from_file(config=load_config_file()):
         done = True
         if VERBOSE:
             local_time_str = time.strftime('%H:%M:%S', time.localtime())
-            print(f'[{local_time_str}] Audio processing complete.')
+            print(f'[{local_time_str}] File processing complete for {INPUT_FILE}.')
     
     def recognised_cb(evt):
         """Callback that saves text when API has recognised solution."""
@@ -53,10 +52,10 @@ def speech_recognize_continuous_from_file(config=load_config_file()):
         """On starting audio processing, output time and message."""
         if VERBOSE:
             local_time_str = time.strftime('%H:%M:%S', time.localtime())
-            print(f'[{local_time_str}] Starting audio processing.')
+            print(f'[{local_time_str}] Starting audio processing for file {INPUT_FILE}.')
 
     # Connect callbacks to the events fired by the speech recognizer
-    # Unused events are recognizing, session_started
+    # Unused events are recognizing
     speech_recognizer.recognized.connect(recognised_cb)
     speech_recognizer.session_started.connect(started_cb)
     speech_recognizer.session_stopped.connect(stop_cb)
@@ -72,4 +71,36 @@ def speech_recognize_continuous_from_file(config=load_config_file()):
         return final_result
 
 
-speech_recognize_continuous_from_file()
+def save_text(text, output_path):
+    """Saves given text to a new text file. Overwrites an existing file."""
+    with open(output_path, 'w') as f:
+        f.write(text)
+
+
+if __name__ == "__main__":
+    config = load_config_file()
+
+    # Get required parameters from config
+    AZ_KEY = config['azure']['key']
+    AZ_REGION = config['azure']['region']
+    INPUT_PATH = config['data']['input_path']
+    OUTPUT_PATH = config['data']['output_path']
+    VERBOSE = config['verbose']
+
+    # Make sure input is a directory
+    if not os.path.isdir(INPUT_PATH):
+        print('Processing failed. Input is not a directory.')
+        sys.exit()
+
+    # Get list of WAV files in input directory
+    files = os.listdir(INPUT_PATH)
+    files = [os.path.join(INPUT_PATH, f) for f in files if f.lower().endswith('.wav')]
+    
+    # Convert all WAV files into text using Azure API
+    all_text = ''
+    for file in files:
+        text = speech_recognize_continuous_from_file(AZ_KEY, AZ_REGION, file, VERBOSE)
+        all_text += text + '\n\n'
+    
+    # Save text to file
+    save_text(all_text, OUTPUT_PATH)
