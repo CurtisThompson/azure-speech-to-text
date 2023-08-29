@@ -3,17 +3,22 @@ import time
 
 import azure.cognitiveservices.speech as speechsdk
 
-with open('config.yml', 'r') as f:
-    config = yaml.safe_load(f)
 
-AZ_KEY = config['azure']['key']
-AZ_REGION = config['azure']['region']
+def load_config_file(file='config.yml'):
+    """Reads a YAML-formatted config file."""
+    with open('config.yml', 'r') as f:
+        config = yaml.safe_load(f)
+    return config
 
-INPUT_FILE = config['data']['input_path']
 
+def speech_recognize_continuous_from_file(config=load_config_file()):
+    """Performs continuous speech recognition with input from a WAV audio file."""
 
-def speech_recognize_continuous_from_file():
-    """performs continuous speech recognition with input from an audio file"""
+    # Get required parameters from config
+    AZ_KEY = config['azure']['key']
+    AZ_REGION = config['azure']['region']
+    INPUT_FILE = config['data']['input_path']
+    VERBOSE = config['verbose']
 
     # Configure Azure speech to text based on stream and API key
     speech_config = speechsdk.SpeechConfig(subscription=AZ_KEY, region=AZ_REGION)
@@ -32,16 +37,28 @@ def speech_recognize_continuous_from_file():
         speech_recognizer.stop_continuous_recognition()
         nonlocal done
         done = True
+        if VERBOSE:
+            local_time_str = time.strftime('%H:%M:%S', time.localtime())
+            print(f'[{local_time_str}] Audio processing complete.')
     
     def recognised_cb(evt):
         """Callback that saves text when API has recognised solution."""
         nonlocal final_result
         final_result += evt.result.text + ' '
+        if VERBOSE:
+            local_time_str = time.strftime('%H:%M:%S', time.localtime())
+            print(f'[{local_time_str}] Audio segment processed.')
+    
+    def started_cb(evt):
+        """On starting audio processing, output time and message."""
+        if VERBOSE:
+            local_time_str = time.strftime('%H:%M:%S', time.localtime())
+            print(f'[{local_time_str}] Starting audio processing.')
 
     # Connect callbacks to the events fired by the speech recognizer
-    # Unused events are recognizing, session_started, session_stopped, canceled
+    # Unused events are recognizing, session_started
     speech_recognizer.recognized.connect(recognised_cb)
-    # Stop continuous recognition on either session stopped or canceled events
+    speech_recognizer.session_started.connect(started_cb)
     speech_recognizer.session_stopped.connect(stop_cb)
     speech_recognizer.canceled.connect(stop_cb)
 
