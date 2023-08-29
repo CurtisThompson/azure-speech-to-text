@@ -77,6 +77,26 @@ def save_text(text, output_path):
         f.write(text)
 
 
+def input_output_checks(input, output):
+    """Perform OS checks on input and output path, ending run if errors."""
+    print(input)
+    print(output)
+    # Make sure input is a directory
+    if not os.path.isdir(input):
+        print('Processing failed. Input is not a directory.')
+        sys.exit()
+    
+    # Make sure output is not a directory
+    if os.path.isdir(output):
+        print('Processing failed. Output already exists as a directory.')
+        sys.exit()
+    
+    # Warn if output already exists
+    if os.path.isfile(output):
+        print('Warning. Output file already exists. File will be overwritten after speech to text conversion.')
+        print('Stop this process if you do not want the file to be overwritten.')
+
+
 if __name__ == "__main__":
     config = load_config_file()
 
@@ -88,9 +108,7 @@ if __name__ == "__main__":
     VERBOSE = config['verbose']
 
     # Make sure input is a directory
-    if not os.path.isdir(INPUT_PATH):
-        print('Processing failed. Input is not a directory.')
-        sys.exit()
+    input_output_checks(INPUT_PATH, OUTPUT_PATH)
 
     # Get list of WAV files in input directory
     files = os.listdir(INPUT_PATH)
